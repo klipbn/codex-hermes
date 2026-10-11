@@ -1,0 +1,3 @@
+name: codex-control
+version: "1.3.0"
+description: Codex CLI monitoring through codex-watch, with cx commands and no LLM calls
