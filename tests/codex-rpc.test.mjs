@@ -43,19 +43,26 @@ test('RPC reads fragmented responses, answers pong, and rejects control methods'
     } finally { rpc.close(); }
 });
 
-test('snapshot paginates and excludes desktop before reading history', async () => {
+test('snapshot includes code-mode terminals and excludes desktop and monitor-origin subagents', async () => {
+    const threads = {
+        cli: { id: 'cli', source: 'vscode', originator: 'codex-tui' },
+        'code-mode': { id: 'code-mode', source: 'vscode', originator: 'codex_hermes_monitor' },
+        child: { id: 'child', source: { subAgent: { thread_spawn: { parent_thread_id: 'code-mode', depth: 1 } } },
+            originator: 'codex_hermes_monitor' },
+        desktop: { id: 'desktop', source: 'vscode', originator: 'Codex Desktop' },
+    };
     const stream = socket(function(_, data) {
         const req = JSON.parse(data); let result;
-        if (req.method === 'thread/loaded/list') result = req.params.cursor ? { data: ['desktop'], nextCursor: null } : { data: ['cli'], nextCursor: 'page2' };
-        else if (req.method === 'thread/read') result = { thread: { id: req.params.threadId, source: 'vscode', originator: req.params.threadId === 'cli' ? 'codex-tui' : 'desktop' } };
-        else { assert.equal(req.params.threadId, 'cli'); result = { data: [{ id: 'turn', status: 'inProgress' }] }; }
+        if (req.method === 'thread/loaded/list') result = req.params.cursor
+            ? { data: ['code-mode', 'child', 'desktop'], nextCursor: null } : { data: ['cli'], nextCursor: 'page2' };
+        else if (req.method === 'thread/read') result = { thread: threads[req.params.threadId] };
+        else { assert.ok(['cli', 'code-mode'].includes(req.params.threadId)); result = { data: [{ id: 'turn', status: 'inProgress' }] }; }
         this.push(frame(JSON.stringify({ id: req.id, result })));
     });
     const rpc = new ReadOnlyRpc(stream);
     try {
         const snapshot = await daemonSnapshot(rpc);
-        assert.equal(snapshot.length, 1);
-        assert.equal(snapshot[0].thread.id, 'cli');
-        assert.equal(snapshot[0].turns[0].id, 'turn');
+        assert.deepEqual(snapshot.map(row => row.thread.id), ['cli', 'code-mode']);
+        assert.deepEqual(snapshot.map(row => row.turns[0].id), ['turn', 'turn']);
     } finally { rpc.close(); }
 });

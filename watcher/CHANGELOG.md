@@ -1,5 +1,10 @@
 # codex-watch changelog
 
+## 1.3.1 — 2026-10-11
+
+- Recognize CLI code-mode sessions reported as `source=vscode` with `originator=codex_hermes_monitor`.
+- Keep monitor-origin subagents excluded and preserve silent history imports and completion deduplication.
+
 ## 1.3.0 — 2026-10-11
 
 - English notification labels, CLI help, operational errors, comments, and documentation.

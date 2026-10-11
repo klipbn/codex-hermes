@@ -9,7 +9,8 @@ type Dict = Record<string, any>;
 const MAX = 8 * 1024 * 1024;
 const METHODS = new Set(['initialize', 'thread/loaded/list', 'thread/read', 'thread/turns/list']);
 export function terminalThread(t: Dict): boolean {
-    return t.source === 'cli' || t.originator === 'codex-tui' || t.originator === 'codex_cli_rs';
+    return t.source === 'cli' || t.originator === 'codex-tui' || t.originator === 'codex_cli_rs' ||
+        (t.source === 'vscode' && t.originator === 'codex_hermes_monitor');
 }
 export class ReadOnlyRpc {
     private buffer = Buffer.alloc(0);
@@ -119,7 +120,7 @@ export async function connectDaemon(socketPath = process.env.CODEX_HERMES_SOCKET
         req.end();
     });
     try {
-        await rpc.request('initialize', { clientInfo: { name: 'codex_hermes_monitor', version: '1.3.0' },
+        await rpc.request('initialize', { clientInfo: { name: 'codex_hermes_monitor', version: '1.3.1' },
             capabilities: { experimentalApi: true } });
         rpc.initialized();
         return rpc;

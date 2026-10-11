@@ -33,8 +33,8 @@ at the next start. `once` handles one event batch without daemon discovery.
 ## Ordinary sessions
 
 Daemon discovery reads loaded threads and turn summaries every ten seconds. Ordinary
-terminal Codex sessions need no special profile. The initial snapshot imports history
-without sending old turn completions; subsequent new completions can notify.
+terminal Codex sessions, including CLI code mode, need no special profile. The initial snapshot
+imports history without sending old turn completions; subsequent new completions can notify.
 
 The worker connects to `$CODEX_HOME/app-server-control/app-server-control.sock`
 (with `~/.codex` as the default Codex home). `CODEX_HERMES_SOCKET` overrides the socket.

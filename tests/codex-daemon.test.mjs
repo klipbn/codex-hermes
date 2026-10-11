@@ -20,34 +20,48 @@ const turn = (id, status, text = '\u0413\u043e\u0442\u043e\u0432\u043e') => ({ i
     completedAt: status === 'inProgress' ? null : 1791321100, durationMs: 100000,
     items: [{ type: 'agentMessage', phase: 'final_answer', text }] });
 
-test('ordinary source=vscode terminal sessions are visible without hooks; desktop is excluded', async t => {
+test('ordinary terminal sessions are visible without hooks; desktop and monitor-origin subagents are excluded', async t => {
     const base = await fixture(t);
     await watch.reconcileDaemon(base, [
         { thread: thread(), turns: [turn('t1', 'inProgress')] },
         { thread: thread('terminal-two', { source: 'cli', originator: 'codex_cli_rs' }), turns: [] },
         { thread: thread('desktop', { originator: 'Codex Desktop' }), turns: [] },
+        { thread: thread('child', { originator: 'codex_hermes_monitor',
+            source: { subAgent: { thread_spawn: { parent_thread_id: 'terminal-one', depth: 1 } } } }), turns: [] },
     ]);
     assert.equal((await watch.readState(base, 'terminal-one')).status, 'busy');
     assert.equal((await watch.readState(base, 'terminal-two')).title, '\u0420\u0435\u0430\u043b\u044c\u043d\u0430\u044f \u0437\u0430\u0434\u0430\u0447\u0430');
     assert.equal(await watch.readState(base, 'desktop'), null);
+    assert.equal(await watch.readState(base, 'child'), null);
     assert.equal((await readdir(join(base, 'outbox'))).length, 0);
 });
 
-test('connection history is silent and new completion notifies exactly once', async t => {
-    const base = await fixture(t);
-    await watch.reconcileDaemon(base, [{ thread: thread(), turns: [turn('old', 'completed'), turn('current', 'inProgress')] }]);
-    assert.equal((await readdir(join(base, 'outbox'))).length, 0);
-    const snapshot = [{ thread: thread('terminal-one', { status: { type: 'idle' } }),
-        turns: [turn('old', 'completed'), turn('current', 'completed', '\u0418\u0441\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u043e')] }];
-    await watch.reconcileDaemon(base, snapshot);
-    await watch.reconcileDaemon(base, snapshot);
-    const state = await watch.readState(base, 'terminal-one');
-    assert.equal(state.status, 'idle');
-    assert.equal(state.turns.length, 2);
-    assert.equal(state.turns.at(-1).summary, '\u0418\u0441\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u043e');
-    assert.equal(state.turns.at(-1).testsAvailable, false);
-    assert.equal((await readdir(join(base, 'outbox'))).length, 1);
-});
+for (const originator of ['codex-tui', 'codex_hermes_monitor']) {
+    test(`connection history is silent and new completion notifies once for ${originator}`, async t => {
+        const base = await fixture(t);
+        await watch.reconcileDaemon(base, [{ thread: thread('terminal-one', { originator }),
+            turns: [turn('old', 'completed'), turn('current', 'inProgress')] }]);
+        assert.equal((await watch.readState(base, 'terminal-one'))?.active?.id, 'current');
+        assert.equal((await readdir(join(base, 'outbox'))).length, 0);
+        const snapshot = [{ thread: thread('terminal-one', { originator, status: { type: 'idle' } }),
+            turns: [turn('old', 'completed'), turn('current', 'completed', '\u0418\u0441\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u043e')] }];
+        await watch.reconcileDaemon(base, snapshot);
+        await watch.reconcileDaemon(base, snapshot);
+        const state = await watch.readState(base, 'terminal-one');
+        assert.equal(state.status, 'idle');
+        assert.equal(state.turns.length, 2);
+        assert.equal(state.turns.at(-1).summary, '\u0418\u0441\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u043e');
+        assert.equal(state.turns.at(-1).testsAvailable, false);
+        assert.equal((await readdir(join(base, 'outbox'))).length, 1);
+        const delivered = [];
+        await watch.tick(base, true, async notice => delivered.push(notice));
+        await watch.reconcileDaemon(base, snapshot);
+        await watch.tick(base, true, async notice => delivered.push(notice));
+        assert.equal(delivered.length, 1);
+        assert.equal(delivered[0].turn.id, 'current');
+        assert.equal((await readdir(join(base, 'outbox'))).length, 0);
+    });
+}
 
 test('approval waiting is visible and notifies on transitions; unloading is not completion', async t => {
     const base = await fixture(t);

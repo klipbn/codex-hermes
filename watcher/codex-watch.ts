@@ -1,4 +1,4 @@
-/** Codex CLI → Hermes v1.3.0. Uses only node:* modules, Node 22.13+ (--experimental-strip-types).
+/** Codex CLI → Hermes v1.3.1. Uses only node:* modules, Node 22.13+ (--experimental-strip-types).
  * hook makes no decisions or network calls; run is the only state writer.
  * Release history is in CHANGELOG.md next to this file.
  */
@@ -11,7 +11,7 @@ import { execFile } from 'node:child_process';
 import { connectDaemon, daemonSnapshot, terminalThread } from './codex-daemon.ts';
 import type { ReadOnlyRpc } from './codex-daemon.ts';
 
-export const WATCHER_VERSION = '1.3.0';
+export const WATCHER_VERSION = '1.3.1';
 type Dict = Record<string, any>;
 const EVENTS = ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse',
     'PermissionRequest', 'Stop', 'Interrupt', 'SessionEnd'];

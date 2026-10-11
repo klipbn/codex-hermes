@@ -1,6 +1,6 @@
 {
     "name": "codex-watch",
-    "version": "1.3.0",
+    "version": "1.3.1",
     "private": true,
     "type": "module",
     "description": "Codex session monitoring and notifications through Hermes",

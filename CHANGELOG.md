@@ -4,6 +4,23 @@ All notable repository-release changes are recorded here. Repository releases fo
 [Semantic Versioning](https://semver.org/) and use `vX.Y.Z` Git tags.
 The watcher and control plugin keep their own independent versions and changelogs.
 
+## [1.0.1] - 2026-10-11
+
+### Included components
+
+- **codex-watch 1.3.1** — [watcher changelog](watcher/CHANGELOG.md).
+- **codex-control 1.3.0** — [control changelog](codex-control/CHANGELOG.md).
+
+### Fixed
+
+- Discover CLI code-mode sessions reported as `source=vscode` with `originator=codex_hermes_monitor`, restoring session listings and new-turn notifications.
+- Keep monitor-origin subagents excluded without changing existing CLI discovery rules.
+
+### Verification
+
+- Cover discovery through the read-only RPC and state reconciliation, including silent history imports and one notification per newly completed turn.
+- Preserve existing state formats, hook definitions, command names, and delivery settings.
+
 ## [1.0.0] - 2026-10-11
 
 ### Included components
@@ -28,4 +45,5 @@ The watcher and control plugin keep their own independent versions and changelog
 - Component runtime versions, state formats, hook definitions, and command identifiers are unchanged by this repository release.
 - Repository versions identify tested source snapshots; they do not replace component versions or update installed copies automatically.
 
+[1.0.1]: https://github.com/klipbn/codex-hermes/releases/tag/v1.0.1
 [1.0.0]: https://github.com/klipbn/codex-hermes/releases/tag/v1.0.0

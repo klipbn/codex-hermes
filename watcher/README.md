@@ -1,4 +1,4 @@
-# codex-watch 1.3.0
+# codex-watch 1.3.1
 
 Codex CLI session observations and Telegram notifications through Hermes.
 Requires Node 22.13+. This source package includes an MIT LICENSE and has no runtime npm dependencies.
@@ -16,6 +16,7 @@ Telegram delivery is off by default. `CODEX_HERMES_SEND=1` enables it.
 Use one worker per `CODEX_HERMES_BASE_DIR` (default `~/.cache/codex-hermes`). Ctrl+C stops it.
 The daemon is only read: there are no start/resume/interrupt/approval calls or subscriptions.
 Initial history is not sent. Generated text is English; original session content stays unchanged.
+Ordinary CLI and CLI code-mode sessions are discovered without hooks.
 
 ## Optional hooks
 
