@@ -120,17 +120,18 @@ export async function connectDaemon(socketPath = process.env.CODEX_HERMES_SOCKET
         req.end();
     });
     try {
-        await rpc.request('initialize', { clientInfo: { name: 'codex_hermes_monitor', version: '1.3.1' },
+        await rpc.request('initialize', { clientInfo: { name: 'codex_hermes_monitor', version: '1.3.2' },
             capabilities: { experimentalApi: true } });
         rpc.initialized();
         return rpc;
     } catch(e) { rpc.close(); throw e; }
 }
-export async function daemonSnapshot(rpc: ReadOnlyRpc): Promise<Dict[]> {
+export async function daemonSnapshot(rpc: ReadOnlyRpc, progress = () => {}): Promise<Dict[]> {
     const ids: string[] = [];
     let cursor: string | null = null;
     do {
         const page = await rpc.request('thread/loaded/list', { limit: 100, cursor });
+        progress();
         if (!Array.isArray(page.data)) throw new Error('Invalid session list');
         ids.push(...page.data);
         cursor = page.nextCursor || null;
@@ -139,10 +140,12 @@ export async function daemonSnapshot(rpc: ReadOnlyRpc): Promise<Dict[]> {
     const snapshot = [];
     for (const id of ids) {
         const { thread } = await rpc.request('thread/read', { threadId: id, includeTurns: false });
+        progress();
         if (!thread || !terminalThread(thread)) continue;
         let turns = null;
         try {
             const page = await rpc.request('thread/turns/list', { threadId: id, limit: 30, sortDirection: 'desc', itemsView: 'summary' });
+            progress();
             if (Array.isArray(page.data)) turns = page.data;
         } catch { /* Status remains available even when history is unsupported. */ }
         snapshot.push({ thread, turns });

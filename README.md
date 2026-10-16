@@ -27,7 +27,7 @@ Codex CLI → watcher → local state ← Hermes control ← slash commands
 
 | Component | Version | Source |
 |---|---|---|
-| `codex-watch` | 1.3.1 | [watcher/](watcher/) |
+| `codex-watch` | 1.3.2 | [watcher/](watcher/) |
 | `codex-control` | 1.3.0 | [codex-control/](codex-control/) |
 
 **Repository release: [v1.0.1](https://github.com/klipbn/codex-hermes/releases/tag/v1.0.1).** The watcher and control plugin have independent versions and release histories.

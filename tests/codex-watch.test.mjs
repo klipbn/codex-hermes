@@ -107,6 +107,70 @@ test('hook CLI emits no decisions even with invalid stdin', async t => {
     assert.equal(result.stdout, '');
 });
 
+test('a stalled state read exits for supervisor recovery and a replacement reclaims the lock', async t => {
+    const base = await fixture(t);
+    await deliver(base, event('UserPromptSubmit'), event('Stop'));
+    await writeFile(join(base, 'control.json'), '{}');
+    const preload = join(base, 'stalled-read.mjs');
+    await writeFile(preload, `
+        import fs from 'node:fs/promises';
+        import { syncBuiltinESMExports } from 'node:module';
+        import { join } from 'node:path';
+        const original = fs.readFile;
+        fs.readFile = (path, ...args) => {
+            if (String(path) === join(process.env.CODEX_HERMES_BASE_DIR, 'control.json')) {
+                console.error('Simulated stalled state read');
+                return new Promise(() => {});
+            }
+            return original(path, ...args);
+        };
+        syncBuiltinESMExports();
+    `);
+    const env = { ...process.env, CODEX_HERMES_BASE_DIR: base,
+        CODEX_HERMES_DISCOVERY: '0', CODEX_HERMES_SEND: '0', CODEX_HERMES_STALL_TIMEOUT_MS: '1000' };
+    const stalled = spawnSync(process.execPath, ['--experimental-strip-types', '--import', preload, path.pathname, 'run'],
+        { env, encoding: 'utf8', timeout: 3000 });
+    assert.match(stalled.stderr, /Simulated stalled state read/);
+    assert.equal(stalled.error, undefined);
+    assert.equal(stalled.status, 1, 'a stalled worker must exit so its supervisor can restart it');
+    assert.equal(stalled.stdout, '');
+    assert.match(stalled.stderr, /no progress.*exiting for supervisor restart/);
+    const replacement = spawnSync(process.execPath, ['--experimental-strip-types', path.pathname, 'once'],
+        { env, encoding: 'utf8', timeout: 3000 });
+    assert.equal(replacement.status, 0, replacement.stderr);
+    assert.equal((await watcher.readState(base, 'session-one')).turns.length, 1);
+    assert.equal(JSON.parse(await readFile(join(base, 'watcher.json'), 'utf8')).sendEnabled, false);
+    assert.ok(!(await readdir(base)).includes('worker.lock'));
+});
+
+test('state processing refreshes the deadline while a long batch keeps making progress', async t => {
+    const base = await fixture(t);
+    for (let i = 0; i < 12; i++) await watcher.enqueue(base,
+        event('SessionStart', { session_id: `session-${i}` }));
+    await watcher.drain(base);
+    const preload = join(base, 'slow-reads.mjs');
+    await writeFile(preload, `
+        import fs from 'node:fs/promises';
+        import { syncBuiltinESMExports } from 'node:module';
+        import { setTimeout } from 'node:timers/promises';
+        const original = fs.readFile;
+        fs.readFile = async (...args) => {
+            await setTimeout(100);
+            return original(...args);
+        };
+        syncBuiltinESMExports();
+    `);
+    const result = spawnSync(process.execPath, ['--experimental-strip-types', '--import', preload, path.pathname, 'once'],
+        { env: { ...process.env, CODEX_HERMES_BASE_DIR: base, CODEX_HERMES_SEND: '0',
+            CODEX_HERMES_DISCOVERY: '0', CODEX_HERMES_STALL_TIMEOUT_MS: '500' },
+        encoding: 'utf8', timeout: 5000 });
+    assert.equal(result.error, undefined);
+    assert.equal(result.status, 0, result.stderr);
+    const health = JSON.parse(await readFile(join(base, 'watcher.json'), 'utf8'));
+    assert.equal(health.sendEnabled, false);
+    assert.equal((await readdir(join(base, 'sessions'))).length, 12);
+});
+
 test('notifications escape HTML and limit long text without truncating tags', async t => {
     const base = await fixture(t);
     const state = await deliver(base, event('UserPromptSubmit', { prompt: '<script>' }),

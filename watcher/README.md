@@ -1,4 +1,4 @@
-# codex-watch 1.3.1
+# codex-watch 1.3.2
 
 Codex CLI session observations and Telegram notifications through Hermes.
 Requires Node 22.13+. This source package includes an MIT LICENSE and has no runtime npm dependencies.
@@ -17,6 +17,13 @@ Use one worker per `CODEX_HERMES_BASE_DIR` (default `~/.cache/codex-hermes`). Ct
 The daemon is only read: there are no start/resume/interrupt/approval calls or subscriptions.
 Initial history is not sent. Generated text is English; original session content stays unchanged.
 Ordinary CLI and CLI code-mode sessions are discovered without hooks.
+
+If state processing or daemon discovery stops making progress for two minutes, the worker exits
+with an error so launchd or another configured supervisor can restart it. Successful state operations
+and daemon reads refresh this deadline; long batches can continue while making progress.
+`CODEX_HERMES_STALL_TIMEOUT_MS` overrides the deadline (default `120000`); keep it longer than the
+poll interval and individual delivery timeouts. A replacement worker reclaims the dead worker's lock.
+Without a supervisor, start the worker again manually. A crash after delivery can still cause a duplicate.
 
 ## Optional hooks
 

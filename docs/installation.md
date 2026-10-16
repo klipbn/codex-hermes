@@ -74,6 +74,7 @@ permissions; their errors do not interrupt Codex. The worker performs state proc
 | `CODEX_HERMES_TG_CHAT_ID` | Hermes home chat | Recipient override |
 | `CODEX_HERMES_TG_TIMEOUT_MS` | `15000` | Bot API request timeout |
 | `CODEX_HERMES_CMD_TIMEOUT_MS` | `30000` | Hermes command timeout |
+| `CODEX_HERMES_STALL_TIMEOUT_MS` | `120000` | Exit after this long without state or daemon progress so a supervisor can restart the worker |
 | `CODEX_HERMES_WAITING_REMINDER_MIN` | `10` | Permission reminders, at most three; `0` disables |
 | `CODEX_HERMES_STATE_RETENTION_HOURS` | `168` | State retention |
 
@@ -88,6 +89,11 @@ For launchd, point `ProgramArguments` to the absolute Node path, `--experimental
 the installed `codex-watch.ts`, and `run`; use the permanent installation as `WorkingDirectory`.
 launchd does not expand `~`. Preserve existing environment, delivery settings, and mute state.
 Linux supervisors use the same worker command and environment.
+
+A worker that stops making progress exits with status 1 after the stall timeout. Configure the
+supervisor to restart on failure; the replacement reclaims a lock left by a dead worker. Without
+a supervisor, restart it manually. Keep the stall timeout above the poll interval and individual
+request/delivery timeouts. The diagnostic contains no session content or credentials.
 
 Back up installed sources and supervisor configuration before updating. Stop only this worker,
 replace both source files together, and restart it. Refresh hook paths only if necessary;

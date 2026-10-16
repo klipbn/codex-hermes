@@ -1,4 +1,4 @@
-/** Codex CLI → Hermes v1.3.1. Uses only node:* modules, Node 22.13+ (--experimental-strip-types).
+/** Codex CLI → Hermes v1.3.2. Uses only node:* modules, Node 22.13+ (--experimental-strip-types).
  * hook makes no decisions or network calls; run is the only state writer.
  * Release history is in CHANGELOG.md next to this file.
  */
@@ -11,7 +11,7 @@ import { execFile } from 'node:child_process';
 import { connectDaemon, daemonSnapshot, terminalThread } from './codex-daemon.ts';
 import type { ReadOnlyRpc } from './codex-daemon.ts';
 
-export const WATCHER_VERSION = '1.3.1';
+export const WATCHER_VERSION = '1.3.2';
 type Dict = Record<string, any>;
 const EVENTS = ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse',
     'PermissionRequest', 'Stop', 'Interrupt', 'SessionEnd'];
@@ -21,6 +21,8 @@ const text = (s: unknown, n = 2000) => typeof s === 'string' ? s.slice(0, n) : '
 const object = (v: unknown): Dict => v && typeof v === 'object' && !Array.isArray(v) ? v as Dict : {};
 const stamp = () => new Date().toISOString();
 const baseDir = () => resolve(process.env.CODEX_HERMES_BASE_DIR || join(homedir(), '.cache/codex-hermes'));
+let watchdog: NodeJS.Timeout | undefined;
+const progress = () => { watchdog?.refresh(); };
 export function numberEnv(name: string, fallback: number, min = 1): number {
     const n = Number(process.env[name]);
     return process.env[name]?.trim() && Number.isFinite(n) && n >= min ? n : fallback;
@@ -30,12 +32,14 @@ async function dirs(base: string) {
         await mkdir(path, { recursive: true, mode: 0o700 });
         await chmod(path, 0o700);
     }
+    progress();
 }
 async function atomic(path: string, value: unknown) {
     const tmp = `${path}.${randomUUID()}.tmp`;
     try {
         await writeFile(tmp, JSON.stringify(value), { mode: 0o600, flag: 'wx' });
         await rename(tmp, path);
+        progress();
     } finally { await unlink(tmp).catch(() => {}); }
 }
 async function json(path: string): Promise<Dict | null> {
@@ -44,6 +48,7 @@ async function json(path: string): Promise<Dict | null> {
         const value = JSON.parse(await readFile(path, 'utf8'));
         return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
     } catch { return null; }
+    finally { progress(); }
 }
 export async function readState(base: string, id: string): Promise<Dict | null> {
     const s = await json(join(base, 'sessions', `${digest(id)}.json`));
@@ -455,6 +460,12 @@ async function main() {
     }
     const base = baseDir();
     const release = await acquire(base);
+    const stallTimeout = Math.min(numberEnv('CODEX_HERMES_STALL_TIMEOUT_MS', 120000), 2147483647);
+    watchdog = setTimeout(() => {
+        console.error('codex-watch: no progress; exiting for supervisor restart.');
+        // Exit before releasing the lock: a stalled write must not overlap a replacement worker.
+        process.exit(1);
+    }, stallTimeout);
     let rpc: ReadOnlyRpc | null = null;
     let nextDiscovery = 0;
     let daemonHealth: Dict = { connected: false };
@@ -464,7 +475,7 @@ async function main() {
             if (mode === 'run' && process.env.CODEX_HERMES_DISCOVERY !== '0' && Date.now() >= nextDiscovery) {
                 try {
                     if (!rpc || rpc.closed) rpc = await connectDaemon();
-                    const snapshot = await daemonSnapshot(rpc);
+                    const snapshot = await daemonSnapshot(rpc, progress);
                     await reconcileDaemon(base, snapshot);
                     daemonHealth = { connected: true, sessions: snapshot.length, checkedAt: stamp() };
                 } catch {
@@ -477,7 +488,7 @@ async function main() {
             if (mode === 'once') break;
             await new Promise(r => setTimeout(r, 2000));
         } while (true);
-    } finally { rpc?.close(); await release(); }
+    } finally { clearTimeout(watchdog); watchdog = undefined; rpc?.close(); await release(); }
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
     main().catch(() => { console.error('codex-watch: worker failed; check permissions, state, and worker.lock.'); process.exitCode = 1; });
