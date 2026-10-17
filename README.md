@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 **Watch Codex CLI sessions and get useful updates in Telegram through Hermes.**
-Read-only daemon discovery, optional hooks, session history, and honest test availability.
+Read-only daemon and local CLI discovery, optional hooks, session history, and honest test availability.
 
 ## Preview
 
@@ -17,7 +17,7 @@ Read-only daemon discovery, optional hooks, session history, and honest test ava
 
 ## What it does
 
-A standalone Node worker reads terminal-origin threads from the local Codex daemon. Optional hooks add test observations. The Hermes control plugin reads the resulting state. Hermes provides the Telegram gateway and the `hermes send` CLI.
+A standalone Node worker reads terminal-origin threads from the local Codex daemon and journals owned by terminal Codex processes running an embedded server. Optional hooks add test observations. The Hermes control plugin reads the resulting state. Hermes provides the Telegram gateway and the `hermes send` CLI.
 The control plugin itself never calls an LLM.
 
 ```text
@@ -27,8 +27,8 @@ Codex CLI → watcher → local state ← Hermes control ← slash commands
 
 | Component | Version | Source |
 |---|---|---|
-| `codex-watch` | 1.3.2 | [watcher/](watcher/) |
-| `codex-control` | 1.3.0 | [codex-control/](codex-control/) |
+| `codex-watch` | 1.4.0 | [watcher/](watcher/) |
+| `codex-control` | 1.3.1 | [codex-control/](codex-control/) |
 
 **Repository release: [v1.0.1](https://github.com/klipbn/codex-hermes/releases/tag/v1.0.1).** The watcher and control plugin have independent versions and release histories.
 
@@ -51,7 +51,7 @@ Node **22.13+**, and Python **3.9+**. The local worker/plugin setup supports mac
 git clone https://github.com/klipbn/codex-hermes.git
 cd codex-hermes
 mkdir -p "$HOME/.local/share/codex-hermes" "$HOME/.hermes/plugins"
-cp watcher/codex-watch.ts watcher/codex-daemon.ts watcher/package.json "$HOME/.local/share/codex-hermes/"
+cp watcher/codex-watch.ts watcher/codex-daemon.ts watcher/codex-local.ts watcher/package.json "$HOME/.local/share/codex-hermes/"
 cp -R codex-control "$HOME/.hermes/plugins/"
 hermes plugins enable codex-control
 node --experimental-strip-types "$HOME/.local/share/codex-hermes/codex-watch.ts" run
@@ -86,7 +86,7 @@ use a session ID for a durable reference. [Full command reference](codex-control
 | `CODEX_HERMES_BASE_DIR` | `~/.cache/codex-hermes` | Shared watcher/control state root |
 | `CODEX_HERMES_NOTIFY` | `done,permission,reminder,error` | Notification levels |
 | `CODEX_HERMES_SEND` | `0` | Only `1` enables Telegram delivery |
-| `CODEX_HERMES_DISCOVERY` | `1` | `0` disables daemon discovery |
+| `CODEX_HERMES_DISCOVERY` | `1` | `0` disables daemon and local CLI discovery |
 
 Keep the OpenCode and Codex state roots separate. Notification labels, help, diagnostics,
 and the OpenCode AI-summary prompt are English. User-provided titles, agent replies,
@@ -110,6 +110,8 @@ are concise. Footers use English dates and Moscow time. [Examples](docs/notifica
 ## Limits and privacy
 
 - Daemon discovery is read-only: no start, resume, interrupt, subscriptions, or approval decisions.
+- Embedded CLI discovery requires `ps`, `lsof`, and readable Codex session files. It identifies sessions through open writer descriptors; old files or a shared project directory do not establish liveness. `/cxstatus` reports each source separately.
+- Local journals expose last observed lifecycle status and final answers, but no complete test or permission-wait journal. Sessions that open and close entirely between polls can be missed.
 - Thread source/originator filtering does not prove that a terminal window is currently open. `UNLOADED` and `STALE` are observations, not proof of closure.
 - Hooks observe recognized shell test commands; daemon-only summaries can have no test journal. Missing data is not reported as zero.
 - The first daemon snapshot imports history without notifying. Delivery retries are bounded; a crash after sending can still cause a duplicate.

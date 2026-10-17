@@ -26,6 +26,18 @@ origin observations, not proof of current terminal window ownership. Initial his
 new completions can notify. Hooks and daemon observations coordinate turn IDs without duplicate
 journal entries. `UNLOADED` and `STALE` are not asserted as terminal closure.
 
+Embedded CLI sessions are also observed through terminal-owned writer descriptors, the read-only
+Codex SQLite index, and bounded session journal tails. An observation has either a `daemon` or
+`local` object containing `observedAt`, `turnsInitialized`, `historyAvailable`, and `originator`.
+The session/turn IDs and schema version stay unchanged across source transitions; initial history
+is silent and existing turn IDs prevent duplicate completion entries. Local journal availability
+does not imply complete history, a test log, or permission-wait visibility.
+
+Heartbeat `local` reports `available`, `checkedAt`, and either the count of additional observed
+sessions (`sessions`) or a content-free `error`. Failed scans retain prior session observations;
+only a successful scan can mark absent sessions unloaded. Older control plugins can still read
+these schema-v1 sessions; current control warns when an older watcher lacks local discovery health.
+
 Hooks only enqueue data. `run` / `once` process state under a single worker lock. Writes are
 atomic, directories are 0700, files are 0600, and invalid numeric environment values fall back.
 The control plugin writes only `control.json`; it never makes permission decisions or LLM calls.

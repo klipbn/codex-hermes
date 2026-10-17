@@ -85,6 +85,25 @@ class ControlTests(unittest.TestCase):
         for c in registered.values():
             self.assertIsInstance(c['handler'](''), str)
 
+    def test_local_discovery_health_distinguishes_empty_unavailable_and_old_watchers(self):
+        from datetime import datetime, timezone
+        health = {'version': '1.4.0', 'heartbeatAt': datetime.now(timezone.utc).isoformat(),
+                  'daemon': {'connected': True, 'sessions': 0}}
+        path = self.base / 'watcher.json'
+        path.write_text(json.dumps(health))
+        self.assertIn('Local CLI: capability unavailable', self.command('cxstatus'))
+        health['local'] = {'available': True, 'sessions': 1}
+        path.write_text(json.dumps(health))
+        self.assertIn('Local CLI: available, additional sessions: 1', self.command('cxstatus'))
+        health['local'] = {'available': False, 'error': 'Session index unavailable.'}
+        path.write_text(json.dumps(health))
+        self.assertIn('Local CLI: unavailable', self.command('cxstatus'))
+        self.assertNotIn('additional sessions: 0', self.command('cxstatus'))
+        health['local'] = {'available': True, 'sessions': 1}
+        health['heartbeatAt'] = '2020-01-01T00:00:00Z'
+        path.write_text(json.dumps(health))
+        self.assertIn('Local CLI: no recent confirmed scan', self.command('cxstatus'))
+
     def test_corrupt_and_unknown_schema_states_are_skipped_with_warning(self):
         folder = self.base / 'sessions'
         folder.mkdir()

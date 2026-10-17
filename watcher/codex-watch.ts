@@ -1,4 +1,4 @@
-/** Codex CLI → Hermes v1.3.2. Uses only node:* modules, Node 22.13+ (--experimental-strip-types).
+/** Codex CLI → Hermes v1.4.0. Uses only node:* modules, Node 22.13+ (--experimental-strip-types).
  * hook makes no decisions or network calls; run is the only state writer.
  * Release history is in CHANGELOG.md next to this file.
  */
@@ -10,8 +10,9 @@ import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { connectDaemon, daemonSnapshot, terminalThread } from './codex-daemon.ts';
 import type { ReadOnlyRpc } from './codex-daemon.ts';
+import { LocalDiscovery } from './codex-local.ts';
 
-export const WATCHER_VERSION = '1.3.2';
+export const WATCHER_VERSION = '1.4.0';
 type Dict = Record<string, any>;
 const EVENTS = ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse',
     'PermissionRequest', 'Stop', 'Interrupt', 'SessionEnd'];
@@ -191,18 +192,20 @@ async function flushNotices(base: string, path: string, s: Dict) {
 }
 
 /** The first snapshot establishes history without sending old summaries. */
-export async function reconcileDaemon(base: string, snapshot: Dict[], now = Date.now()) {
+export async function reconcileDaemon(base: string, snapshot: Dict[], now = Date.now(),
+    available = { daemon: true, local: true }) {
     await dirs(base);
     const observed = new Set<string>();
     const iso = new Date(now).toISOString();
-    for (const { thread: t, turns } of snapshot) {
+    for (const { thread: t, turns, observationSource } of snapshot) {
         if (!t || typeof t.id !== 'string' || !terminalThread(t)) continue;
         observed.add(t.id);
         const s = await readState(base, t.id) || reduce(null, { id: randomUUID(), at: iso,
             event: 'SessionStart', sessionID: t.id, directory: text(t.cwd, 4096) });
         const previousStatus = s.status;
-        const initialized = s.daemon?.turnsInitialized === true;
-        const alreadyObserved = !!s.daemon;
+        const source = observationSource === 'local' ? 'local' : 'daemon';
+        const initialized = (s.daemon || s.local)?.turnsInitialized === true;
+        const alreadyObserved = !!(s.daemon || s.local);
         if (t.name || t.preview) s.title = text(t.name || t.preview, 200).replace(/\s+/g, ' ');
         if (t.cwd) { s.directory = text(t.cwd, 4096); s.project = basename(s.directory); }
         s.updatedAt = iso;
@@ -251,20 +254,25 @@ export async function reconcileDaemon(base: string, snapshot: Dict[], now = Date
         s.status = t.status?.type === 'active'
             ? (flags.includes('waitingOnApproval') || flags.includes('waitingOnUserInput') ? 'waiting' : 'busy')
             : ({ idle: 'idle', notLoaded: 'unloaded', systemError: 'error' } as Dict)[t.status?.type] || 'unknown';
+        // Local lifecycle records cannot disprove a confirmed permission wait for the same turn.
+        if (source === 'local' && s.status === 'busy' && previousStatus === 'waiting' &&
+            turns?.some((turn: Dict) => turn.id === s.active?.id && turn.status === 'inProgress')) s.status = 'waiting';
         if (s.status === 'waiting') {
             if (previousStatus !== 'waiting') {
                 s.waitingSince = iso; s.reminders = 0;
                 if (alreadyObserved) addNotice(s, 'permission', `permission:${iso}`);
             }
         } else s.waitingSince = null;
-        s.daemon = { observedAt: iso, turnsInitialized: initialized || Array.isArray(turns),
+        s[source] = { observedAt: iso, turnsInitialized: initialized || Array.isArray(turns),
             historyAvailable: Array.isArray(turns), originator: t.originator || t.source };
+        delete s[source === 'local' ? 'daemon' : 'local'];
         const path = join(base, 'sessions', `${digest(t.id)}.json`);
         await atomic(path, s); await flushNotices(base, path, s);
     }
     for (const name of (await readdir(join(base, 'sessions'))).filter(x => x.endsWith('.json'))) {
         const path = join(base, 'sessions', name), s = await json(path);
-        if (s?.daemon && !observed.has(s.sessionID) && s.status !== 'closed' && s.status !== 'unloaded') {
+        if (s && ((s.daemon && available.daemon) || (s.local && available.local)) &&
+            !observed.has(s.sessionID) && s.status !== 'closed' && s.status !== 'unloaded') {
             s.status = 'unloaded'; s.updatedAt = iso; s.waitingSince = null;
             await atomic(path, s);
         }
@@ -361,7 +369,7 @@ async function sendRich(html: string) {
     return response.ok && (await response.json() as Dict)?.ok === true;
 }
 export async function tick(base: string, send = process.env.CODEX_HERMES_SEND === '1',
-    deliver: (n: Dict) => Promise<void> = sendNotification, now = Date.now(), daemonHealth: Dict = {}) {
+    deliver: (n: Dict) => Promise<void> = sendNotification, now = Date.now(), daemonHealth: Dict = {}, localHealth: Dict = {}) {
     await dirs(base);
     const control = await json(join(base, 'control.json')) || {};
     const disabled = Array.isArray(control.disabledLevels) ? control.disabledLevels : [];
@@ -401,7 +409,7 @@ export async function tick(base: string, send = process.env.CODEX_HERMES_SEND ==
     }
     await atomic(join(base, 'watcher.json'), { version: WATCHER_VERSION, pid: process.pid,
         heartbeatAt: stamp(), sendEnabled: send, muteUntil: control.muteUntil || null,
-        disabledLevels: disabled, deliveryFailures: failures, daemon: daemonHealth });
+        disabledLevels: disabled, deliveryFailures: failures, daemon: daemonHealth, local: localHealth });
 }
 
 export function hooksConfig(script = fileURLToPath(import.meta.url), node = process.execPath) {
@@ -469,22 +477,35 @@ async function main() {
     let rpc: ReadOnlyRpc | null = null;
     let nextDiscovery = 0;
     let daemonHealth: Dict = { connected: false };
+    let localHealth: Dict = { available: false, error: 'Local discovery is disabled.' };
+    const local = new LocalDiscovery(process.env.CODEX_HOME || join(homedir(), '.codex'));
     try {
         do {
             await drain(base);
             if (mode === 'run' && process.env.CODEX_HERMES_DISCOVERY !== '0' && Date.now() >= nextDiscovery) {
+                let snapshot: Dict[] = [];
                 try {
                     if (!rpc || rpc.closed) rpc = await connectDaemon();
-                    const snapshot = await daemonSnapshot(rpc, progress);
-                    await reconcileDaemon(base, snapshot);
+                    snapshot = await daemonSnapshot(rpc, progress);
                     daemonHealth = { connected: true, sessions: snapshot.length, checkedAt: stamp() };
                 } catch {
                     rpc?.close(); rpc = null;
                     daemonHealth = { connected: false, checkedAt: stamp(), error: 'Local Codex daemon is unavailable; hooks continue to work.' };
                 }
+                try {
+                    const additional = await local.snapshot(progress, new Set(snapshot.map(row => row.thread.id)));
+                    snapshot.push(...additional);
+                    localHealth = { available: true, sessions: additional.filter(row => row.thread.status.type !== 'notLoaded').length,
+                        checkedAt: stamp() };
+                } catch {
+                    localHealth = { available: false, checkedAt: stamp(),
+                        error: 'Local CLI discovery unavailable: check ps, lsof, and Codex session files.' };
+                }
+                await reconcileDaemon(base, snapshot, Date.now(), {
+                    daemon: daemonHealth.connected === true, local: localHealth.available === true });
                 nextDiscovery = Date.now() + 10000;
             }
-            await tick(base, process.env.CODEX_HERMES_SEND === '1', sendNotification, Date.now(), daemonHealth);
+            await tick(base, process.env.CODEX_HERMES_SEND === '1', sendNotification, Date.now(), daemonHealth, localHealth);
             if (mode === 'once') break;
             await new Promise(r => setTimeout(r, 2000));
         } while (true);

@@ -9,7 +9,7 @@ from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 ROOT = Path(__file__).resolve().parents[1]
 WATCHERS = {
     "hermes-watch": ("hermes-watch.ts",),
-    "codex-watch": ("codex-watch.ts", "codex-daemon.ts"),
+    "codex-watch": ("codex-watch.ts", "codex-daemon.ts", "codex-local.ts"),
 }
 
 

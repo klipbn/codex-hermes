@@ -1,7 +1,8 @@
 # Installation and configuration
 
 Codex Hermes uses a standalone Node worker and a separate Hermes command plugin.
-Requires Node 22.13+, Python 3.9+, Hermes, and Codex CLI with a local app-server daemon.
+Requires Node 22.13+, Python 3.9+, Hermes, and Codex CLI. Local CLI discovery also requires
+`ps` and `lsof` (install `lsof` separately on Linux if absent).
 Hooks are optional and require a Codex build supporting official hook definitions.
 The daemon interface is version-dependent; `/cxstatus` reports connection failures.
 
@@ -11,13 +12,13 @@ From the repository root:
 
 ```sh
 mkdir -p "$HOME/.local/share/codex-hermes" "$HOME/.hermes/plugins"
-cp watcher/codex-watch.ts watcher/codex-daemon.ts watcher/package.json "$HOME/.local/share/codex-hermes/"
+cp watcher/codex-watch.ts watcher/codex-daemon.ts watcher/codex-local.ts watcher/package.json "$HOME/.local/share/codex-hermes/"
 cp -R codex-control "$HOME/.hermes/plugins/"
 hermes plugins enable codex-control
 node --experimental-strip-types "$HOME/.local/share/codex-hermes/codex-watch.ts" run
 ```
 
-Use `$HERMES_HOME/plugins/` for a custom Hermes home. Both `.ts` files must be beside one another.
+Use `$HERMES_HOME/plugins/` for a custom Hermes home. All three `.ts` files must be beside one another.
 No runtime npm/pip dependencies are required. `/cxhelp`, `/cxstatus`, and `/cx` inspect the setup.
 A running gateway may need `hermes gateway restart` after its active work completes.
 
@@ -38,9 +39,30 @@ imports history without sending old turn completions; subsequent new completions
 
 The worker connects to `$CODEX_HOME/app-server-control/app-server-control.sock`
 (with `~/.codex` as the default Codex home). `CODEX_HERMES_SOCKET` overrides the socket.
-`CODEX_HERMES_DISCOVERY=0` disables this path. Reading never resumes, starts, interrupts,
+`CODEX_HERMES_DISCOVERY=0` disables both daemon and local CLI discovery. Reading never resumes, starts, interrupts,
 subscribes to, or approves a thread. An unavailable daemon leaves the last observations
 available while `/cxstatus` reports the failure.
+
+## Embedded CLI sessions
+
+Codex can run an in-process server, for example with CLI configuration overrides. Those sessions
+are absent from the shared daemon's loaded list. The worker also scans terminal Codex processes,
+uses their open `thread-writer-locks/<session_id>.lock` descriptors to identify sessions, and reads
+the corresponding rows from `$CODEX_HOME/state_*.sqlite` in read-only mode. It reads at most 4 MiB
+from each journal under `$CODEX_HOME/sessions`, retaining up to 30 lifecycle observations.
+It never guesses session identity from a project directory or treats old lock files as live owners.
+
+Both sources are polled every ten seconds. Daemon observations take priority for duplicate IDs.
+The first local history is silent; later completion records use the existing notification queue.
+When a previously observed terminal disappears, the worker reads its final journal once more.
+Sessions that open and close between polls, or close while the worker is stopped, can be missed.
+Local status is the last journal lifecycle observation, not proof that work is still progressing.
+Permission waiting and complete test logs are unavailable from this reader; hooks remain optional.
+
+`/cxstatus` distinguishes daemon connectivity and additional local sessions. Missing tools,
+unsupported index schemas, or unreadable journals make local discovery unavailable; previous
+observations are retained. A healthy empty daemon alone does not establish that there are no CLI sessions.
+No launcher or Codex configuration changes are required.
 
 ## Optional hooks
 
@@ -67,7 +89,7 @@ permissions; their errors do not interrupt Codex. The worker performs state proc
 | `CODEX_HERMES_BASE_DIR` | `~/.cache/codex-hermes` | Shared worker/control root |
 | `CODEX_HERMES_SEND` | `0` | Only `1` enables delivery |
 | `CODEX_HERMES_NOTIFY` | `done,permission,reminder,error` | Enabled notification levels |
-| `CODEX_HERMES_DISCOVERY` | enabled | `0` disables daemon discovery |
+| `CODEX_HERMES_DISCOVERY` | enabled | `0` disables daemon and local CLI discovery |
 | `CODEX_HERMES_SOCKET` | Codex home socket | Socket override |
 | `CODEX_HERMES_TG_RICH` | `1` | Try rich messages; `0` forces fallback |
 | `CODEX_HERMES_TG_TOKEN` | Hermes token | Telegram token override |
@@ -96,6 +118,6 @@ a supervisor, restart it manually. Keep the stall timeout above the poll interva
 request/delivery timeouts. The diagnostic contains no session content or credentials.
 
 Back up installed sources and supervisor configuration before updating. Stop only this worker,
-replace both source files together, and restart it. Refresh hook paths only if necessary;
+replace all three source files together, and restart it. Refresh hook paths only if necessary;
 new definitions require normal trust review. Do not restart the shared Codex daemon just
 to update the watcher. Update the control plugin and restart the Hermes gateway separately.
