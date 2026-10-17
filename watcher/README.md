@@ -1,4 +1,4 @@
-# codex-watch 1.3.2
+# codex-watch 1.4.0
 
 Codex CLI session observations and Telegram notifications through Hermes.
 Requires Node 22.13+. This source package includes an MIT LICENSE and has no runtime npm dependencies.
@@ -6,7 +6,7 @@ The Hermes command plugin `codex-control` is installed separately.
 
 ## Run
 
-Keep `codex-watch.ts` and `codex-daemon.ts` beside each other:
+Keep `codex-watch.ts`, `codex-daemon.ts`, and `codex-local.ts` beside each other:
 
 ```sh
 node --experimental-strip-types codex-watch.ts run
@@ -17,6 +17,10 @@ Use one worker per `CODEX_HERMES_BASE_DIR` (default `~/.cache/codex-hermes`). Ct
 The daemon is only read: there are no start/resume/interrupt/approval calls or subscriptions.
 Initial history is not sent. Generated text is English; original session content stays unchanged.
 Ordinary CLI and CLI code-mode sessions are discovered without hooks.
+Embedded-server sessions are discovered through terminal-owned writer descriptors (`ps` and `lsof`),
+the read-only Codex SQLite index, and bounded local journal reads. No launcher or Codex config change
+is required. Local journals provide last observed lifecycle status and final answers; complete tests
+and approval waiting remain unavailable. `/cxstatus` reports unavailable discovery separately from zero sessions.
 
 If state processing or daemon discovery stops making progress for two minutes, the worker exits
 with an error so launchd or another configured supervisor can restart it. Successful state operations
@@ -36,8 +40,8 @@ Generate definitions after installing the files at their permanent location: pat
 Trust new hooks through the Codex `/hooks` interface. Do not replace existing configurations
 automatically. Hooks capture observations, do not use the network, and do not decide permissions.
 
-`hook` stores one input event; `once` drains events without daemon discovery;
-`run` observes daemon threads, drains events, and handles delivery.
+`hook` stores one input event; `once` drains events without discovery;
+`run` observes daemon threads and local CLI journals, drains events, and handles delivery.
 
 ## Development
 

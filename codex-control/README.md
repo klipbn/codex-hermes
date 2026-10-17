@@ -1,4 +1,4 @@
-# Codex Control 1.3.0
+# Codex Control 1.3.1
 
 A standalone Hermes command plugin for Codex CLI observations from codex-watch.
 It reads local state and never calls an LLM, resumes a thread, or decides permissions.
@@ -26,7 +26,7 @@ work completes if updated commands have not loaded. Python stdlib only; no pip i
 | `/cxclosed` | Closed or unloaded observations |
 | `/cxlast` | Most recent completed turn |
 | `/cxmute [minutes\|off\|levels]` | Pause or filter delivery |
-| `/cxstatus` | Worker heartbeat, daemon connection, and delivery health |
+| `/cxstatus` | Worker heartbeat, daemon/local CLI discovery, and delivery health |
 | `/cxhelp` | Registry-generated help |
 
 Targets accept a current list number, session ID, or unique ID prefix. With no target,
@@ -44,6 +44,8 @@ turn summaries may lack a test journal; hooks add recognized shell-test observat
 Missing exit codes stay unknown, and unavailable cost, tokens, and full diff stay unavailable.
 The retained journal contains at most 30 turns per session and is not all-time accounting.
 STALE, UNLOADED, and a fresh worker heartbeat do not prove whether a terminal window is open.
+Local CLI discovery is reported separately from the daemon. Older watchers produce an explicit
+missing-capability warning; an unavailable scan is never displayed as zero additional sessions.
 
 Full setup: https://github.com/klipbn/codex-hermes/blob/main/docs/installation.md
 

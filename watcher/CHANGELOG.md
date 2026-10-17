@@ -1,5 +1,12 @@
 # codex-watch changelog
 
+## 1.4.0 — 2026-10-17
+
+- Discover embedded-server CLI sessions through open writer descriptors, a read-only SQLite index, and bounded local journal reads, independently of the shared daemon.
+- Preserve silent initial history and turn deduplication across daemon/local transitions; read a known session's final journal when its terminal disappears between polls.
+- Report local discovery health separately; failed scans preserve prior observations instead of unloading them.
+- Include `codex-local.ts` in installation and source archives. Local discovery needs `ps` and `lsof`; no runtime npm dependency or Codex/launcher configuration change is required.
+
 ## 1.3.2 — 2026-10-16
 
 - Exit with an error after two minutes without state or daemon progress so an existing supervisor can restart a stalled worker.

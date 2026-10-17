@@ -120,7 +120,7 @@ export async function connectDaemon(socketPath = process.env.CODEX_HERMES_SOCKET
         req.end();
     });
     try {
-        await rpc.request('initialize', { clientInfo: { name: 'codex_hermes_monitor', version: '1.3.2' },
+        await rpc.request('initialize', { clientInfo: { name: 'codex_hermes_monitor', version: '1.4.0' },
             capabilities: { experimentalApi: true } });
         rpc.initialized();
         return rpc;

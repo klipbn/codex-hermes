@@ -7,7 +7,7 @@ from pathlib import Path
 import tempfile
 from datetime import datetime, timezone, timedelta
 
-PLUGIN_VERSION = '1.3.0'
+PLUGIN_VERSION = '1.3.1'
 BASE_DIR = Path(os.environ.get('CODEX_HERMES_BASE_DIR', Path.home() / '.cache/codex-hermes'))
 LEVELS = ('done', 'permission', 'reminder', 'error')
 LIMIT = 2 * 1024 * 1024
@@ -292,9 +292,18 @@ def handle_status(raw=''):
     acknowledged = health.get('muteUntil') == control.get('muteUntil') and health.get('disabledLevels', []) == control.get('disabledLevels', [])
     daemon = health.get('daemon') or {}
     daemon_line = f"Daemon: connected, terminal sessions: {daemon.get('sessions', 0)}" if daemon.get('connected') and fresh else 'Daemon: no recent confirmed connection'
+    local = health.get('local')
+    if not isinstance(local, dict) or 'available' not in local:
+        local_line = 'Local CLI: capability unavailable; update the watcher to monitor embedded sessions.'
+    elif not fresh:
+        local_line = 'Local CLI: no recent confirmed scan'
+    elif local.get('available'):
+        local_line = f"Local CLI: available, additional sessions: {local.get('sessions', '?')}"
+    else:
+        local_line = 'Local CLI: unavailable. ' + str(local.get('error') or 'Check ps, lsof, and Codex session files.')
     return (f"Codex watcher {health.get('version', '?')} · {'running' if fresh else 'STALE'}\n"
             f"Telegram: {'enabled' if health.get('sendEnabled') else 'disabled'}\n"
-            f"{daemon_line}\n"
+            f"{daemon_line}\n{local_line}\n"
             f"Mute: {'applied' if acknowledged and fresh else 'awaiting watcher acknowledgement'}\n"
             f"Delivery failures this cycle: {health.get('deliveryFailures', '?')}\n"
             'A fresh watcher heartbeat does not prove session terminals are open.')

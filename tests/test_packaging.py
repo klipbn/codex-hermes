@@ -46,7 +46,7 @@ class PackagingTests(unittest.TestCase):
             if component == "watcher":
                 expected |= {"package.json", f"{self.watcher}.ts"}
                 if self.watcher == "codex-watch":
-                    expected.add("codex-daemon.ts")
+                    expected |= {"codex-daemon.ts", "codex-local.ts"}
             else:
                 expected |= {"__init__.py", "plugin.yaml"}
             with ZipFile(archives[0]) as archive:
