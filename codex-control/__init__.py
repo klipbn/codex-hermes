@@ -7,10 +7,11 @@ from pathlib import Path
 import tempfile
 from datetime import datetime, timezone, timedelta
 
-PLUGIN_VERSION = '1.3.1'
+PLUGIN_VERSION = '1.4.0'
 BASE_DIR = Path(os.environ.get('CODEX_HERMES_BASE_DIR', Path.home() / '.cache/codex-hermes'))
 LEVELS = ('done', 'permission', 'reminder', 'error')
 LIMIT = 2 * 1024 * 1024
+ICONS = {'BUSY': '🟡', 'WAITING': '🔐', 'IDLE': '🟢', 'ERROR': '🔴', 'INTERRUPTED': '🟠'}
 
 
 def number_env(name, default):
@@ -77,6 +78,11 @@ def short(value, limit):
     return value if len(value) <= limit else value[:limit - 1] + '…'
 
 
+def human_duration(seconds):
+    seconds = max(0, int(seconds))
+    return f'{seconds}s' if seconds < 60 else f'{seconds // 60}m' if seconds < 3600 else f'{seconds // 3600}h {seconds % 3600 // 60}m'
+
+
 def session_age(s):
     state = s.get('status')
     if state == 'waiting':
@@ -88,15 +94,13 @@ def session_age(s):
     date = parse_date(at)
     if date == datetime.min.replace(tzinfo=timezone.utc):
         return '?'
-    seconds = max(0, int((datetime.now(timezone.utc) - date).total_seconds()))
-    age = f'{seconds}s' if seconds < 60 else f'{seconds // 60}m' if seconds < 3600 else f'{seconds // 3600}h {seconds % 3600 // 60}m'
+    age = human_duration((datetime.now(timezone.utc) - date).total_seconds())
     return age if state in ('busy', 'waiting') else age + ' ago'
 
 
 def compact_row(s, number):
     label = status(s).split()[0]
-    icon = {'BUSY': '🟡', 'WAITING': '🔐', 'IDLE': '🟢', 'ERROR': '🔴',
-            'INTERRUPTED': '🟠'}.get(label, '⚪')
+    icon = ICONS.get(label, '⚪')
     project = short(s.get('project') or 'unknown project', 36)
     model = short(s.get('model') or (s.get('active') or {}).get('model') or '—', 28)
     title = short(s.get('title') or s.get('project') or 'Codex', 82)
@@ -135,12 +139,37 @@ def test_counts(turn):
     return f"✅ {counts.get('passed', 0)} · ❌ {counts.get('failed', 0)} · ❔ {counts.get('unknown', 0)}{suffix}"
 
 
+def home_path(path):
+    home = str(Path.home())
+    return '~' + path[len(home):] if path == home or path.startswith(home + os.sep) else path
+
+
+def session_detail(s):
+    label = status(s)
+    turn = s['turns'][-1] if s['turns'] else {}
+    model = s.get('model') or (s.get('active') or {}).get('model') or turn.get('model') or 'unavailable'
+    lines = [f"{ICONS.get(label.split()[0], '⚪')} Codex · {label}", '',
+             f"📝 {s.get('title') or s.get('project') or 'Untitled session'}",
+             f"📁 {s.get('project') or 'unknown project'}"]
+    if s.get('directory'):
+        lines.append(f"📂 {home_path(s['directory'])}")
+    lines += [f'⏱️ {session_age(s)}', f"🆔 {s['sessionID']}", f'🤖 Model {model}']
+    if turn:
+        duration = turn.get('durationMs')
+        duration = human_duration(duration / 1000) if isinstance(duration, (int, float)) else 'duration unavailable'
+        lines.append(f"🏁 Last turn: {turn.get('outcome', 'unavailable')} · {duration}")
+    summary = turn.get('summary') or 'No completed turns yet.'
+    # Leave room for the header within the Telegram reply limit.
+    summary = summary if len(summary) <= 3000 else summary[:2999] + '…'
+    return '\n'.join(lines) + '\n\n🧠 Last summary\n' + summary
+
+
 def handle_cx(raw=''):
     if raw.strip() and raw.strip() != 'all':
         s, warning = target(raw)
         if not s:
             return warning
-        return heading(s) + f"\nUpdated: {s.get('updatedAt', 'unavailable')}\n" + handle_sum(s['sessionID']) + warning
+        return session_detail(s) + warning
     rows, warning = states()
     history = raw.strip() == 'all'
     if not history:

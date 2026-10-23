@@ -1,5 +1,10 @@
 # codex-control changelog
 
+## 1.4.0 — 2026-10-23
+
+- `/cx <number|session_id>` uses the OpenCode-style layout: status heading, session name, project, directory, age, ID, model, last turn outcome, and last summary.
+- Session details no longer include the always-unavailable test, diff, and cost lines; `/cxtests`, `/cxdiff`, and `/cxsum` are unchanged.
+
 ## 1.3.1 — 2026-10-17
 
 - Show local CLI discovery separately from daemon connectivity in `/cxstatus`.
