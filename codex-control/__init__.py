@@ -7,7 +7,7 @@ from pathlib import Path
 import tempfile
 from datetime import datetime, timezone, timedelta
 
-PLUGIN_VERSION = '1.4.0'
+PLUGIN_VERSION = '1.4.1'
 BASE_DIR = Path(os.environ.get('CODEX_HERMES_BASE_DIR', Path.home() / '.cache/codex-hermes'))
 LEVELS = ('done', 'permission', 'reminder', 'error')
 LIMIT = 2 * 1024 * 1024
@@ -154,14 +154,19 @@ def session_detail(s):
     if s.get('directory'):
         lines.append(f"📂 {home_path(s['directory'])}")
     lines += [f'⏱️ {session_age(s)}', f"🆔 {s['sessionID']}", f'🤖 Model {model}']
-    if turn:
-        duration = turn.get('durationMs')
-        duration = human_duration(duration / 1000) if isinstance(duration, (int, float)) else 'duration unavailable'
-        lines.append(f"🏁 Last turn: {turn.get('outcome', 'unavailable')} · {duration}")
     summary = turn.get('summary') or 'No completed turns yet.'
-    # Leave room for the header within the Telegram reply limit.
-    summary = summary if len(summary) <= 3000 else summary[:2999] + '…'
-    return '\n'.join(lines) + '\n\n🧠 Last summary\n' + summary
+    # Leave room for the other sections within the Telegram reply limit.
+    summary = summary if len(summary) <= 2800 else summary[:2799] + '…'
+    lines += ['', '🧠 Last summary', summary, '', '📦 Session diff', 'Unavailable', '', '🧪 Tests']
+    tests = turn.get('tests') or []
+    if turn and turn.get('testsAvailable') is False:
+        lines.append('Unavailable')
+    elif not tests:
+        lines.append('Tests not run')
+    for t in tests[-6:]:
+        icon = {'passed': '✅', 'failed': '❌', 'running': '⏳'}.get(t.get('status'), '❔')
+        lines.append(f"{icon} {short(t.get('command', ''), 150)}")
+    return '\n'.join(lines)
 
 
 def handle_cx(raw=''):

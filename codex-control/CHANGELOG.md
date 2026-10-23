@@ -1,5 +1,10 @@
 # codex-control changelog
 
+## 1.4.1 — 2026-10-23
+
+- Match the OpenCode `/oc` session layout in `/cx <number|session_id>`: add the `📦 Session diff` and `🧪 Tests` sections and drop the extra last-turn line.
+- Tests show recorded runs, `Tests not run`, or `Unavailable` when the turn has no test log.
+
 ## 1.4.0 — 2026-10-23
 
 - `/cx <number|session_id>` uses the OpenCode-style layout: status heading, session name, project, directory, age, ID, model, last turn outcome, and last summary.
