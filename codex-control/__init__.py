@@ -7,11 +7,12 @@ from pathlib import Path
 import tempfile
 from datetime import datetime, timezone, timedelta
 
-PLUGIN_VERSION = '1.4.1'
+PLUGIN_VERSION = '1.4.2'
 BASE_DIR = Path(os.environ.get('CODEX_HERMES_BASE_DIR', Path.home() / '.cache/codex-hermes'))
 LEVELS = ('done', 'permission', 'reminder', 'error')
 LIMIT = 2 * 1024 * 1024
-ICONS = {'BUSY': '🟡', 'WAITING': '🔐', 'IDLE': '🟢', 'ERROR': '🔴', 'INTERRUPTED': '🟠'}
+ICONS = {'BUSY': '🟡', 'WAITING': '🔐', 'IDLE': '⚪️', 'ERROR': '🔴', 'INTERRUPTED': '🟠',
+         'STALE': '💤', 'UNKNOWN': '❔', 'CLOSED': '⚫️', 'UNLOADED': '⚫️'}
 
 
 def number_env(name, default):

@@ -1,5 +1,9 @@
 # codex-control changelog
 
+## 1.4.2 — 2026-10-23
+
+- Match OpenCode `/oc` status icons in `/cx`: IDLE is ⚪️ instead of 🟢; STALE is 💤, UNKNOWN is ❔, and CLOSED/UNLOADED are ⚫️.
+
 ## 1.4.1 — 2026-10-23
 
 - Match the OpenCode `/oc` session layout in `/cx <number|session_id>`: add the `📦 Session diff` and `🧪 Tests` sections and drop the extra last-turn line.
