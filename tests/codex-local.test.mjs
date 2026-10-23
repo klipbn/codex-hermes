@@ -88,11 +88,21 @@ test('failed discovery preserves observations; only a successful empty scan unlo
     await appendFile(f.path, '{incomplete');
     assert.equal((await f.discovery.snapshot())[0].thread.status.type, 'active');
     await appendFile(f.path, '\n');
-    await assert.rejects(f.discovery.snapshot(), SyntaxError);
+    // A damaged record makes only this session unknown instead of failing every local session.
+    assert.equal((await f.discovery.snapshot())[0].thread.status.type, 'unknown');
     await writeFile(f.path, event('task_started'));
     f.setOwners('');
     await reconcileDaemon(f.base, await f.discovery.snapshot());
     assert.equal((await readState(f.base, id)).status, 'unloaded');
+});
+
+test('the Codex session name is preferred over the first prompt', async t => {
+    const f = await fixture(t);
+    f.db.exec('ALTER TABLE threads ADD COLUMN name TEXT');
+    f.db.prepare('UPDATE threads SET name=? WHERE id=?').run('[TRG-1] - Named \u0441\u0435\u0441\u0441\u0438\u044f', id);
+    assert.equal((await f.discovery.snapshot())[0].thread.name, '[TRG-1] - Named \u0441\u0435\u0441\u0441\u0438\u044f');
+    f.db.prepare('UPDATE threads SET name=NULL WHERE id=?').run(id);
+    assert.equal((await f.discovery.snapshot())[0].thread.name, 'Original \u0442\u0435\u043a\u0441\u0442');
 });
 
 test('switching between local and daemon observations does not duplicate completed turns', async t => {

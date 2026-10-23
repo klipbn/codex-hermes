@@ -59,7 +59,10 @@ async function journal(path: string, row: Dict): Promise<Dict> {
         for (const line of data.split('\n')) {
             if (!line) continue;
             if (Buffer.byteLength(line) > MAX_LINE) { state = 'unknown'; continue; }
-            const record = JSON.parse(line), p = record.payload;
+            let record: Dict;
+            // One damaged record must not hide every other local session.
+            try { record = JSON.parse(line); } catch { state = 'unknown'; continue; }
+            const p = record?.payload;
             if (!p || typeof p !== 'object') continue;
             if (record.type === 'session_meta' && p.id !== row.id) throw new Error('Local journal identity mismatch');
             const at = Date.parse(record.timestamp) / 1000;
@@ -84,7 +87,8 @@ async function journal(path: string, row: Dict): Promise<Dict> {
             if (turns.size > 30) turns.delete(turns.keys().next().value!);
         }
         return { thread: { id: row.id, source: row.source, originator: row.originator, cwd: row.cwd,
-            name: row.title, model, createdAt: row.created_at, updatedAt, status: { type: state } },
+            // `name` holds the user-visible thread name; `title` is the first prompt.
+            name: row.name || row.title, model, createdAt: row.created_at, updatedAt, status: { type: state } },
             turns: [...turns.values()], observationSource: 'local' };
     } finally { await file.close(); }
 }
@@ -142,7 +146,7 @@ export class LocalDiscovery {
             for (const name of ['id', 'source', 'cwd', 'rollout_path']) {
                 if (!columns.has(name)) throw new Error('Unsupported local session index');
             }
-            const fields = ['id', 'source', 'cwd', 'rollout_path', 'originator', 'title', 'model', 'created_at', 'updated_at']
+            const fields = ['id', 'source', 'cwd', 'rollout_path', 'originator', 'name', 'title', 'model', 'created_at', 'updated_at']
                 .map(name => columns.has(name) ? name : `NULL AS ${name}`).join(',');
             rows = db.prepare(`SELECT ${fields} FROM threads WHERE id IN (${ids.map(() => '?').join(',')})`).all(...ids) as Dict[];
         } finally { db.close(); }

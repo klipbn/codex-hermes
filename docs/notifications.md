@@ -6,18 +6,18 @@ using actual renderer output; the chat list and message context are fictional.
 ## Completed turn
 
 ```text
-📝 Fix retry handling
-Completed · Codex · demo-worker
+Codex · 📝 Fix retry handling
+✅ Completed · demo-worker
 
 🧠 Summary
 Fixed retry handling and verified the worker.
 
-📦 Diff: unavailable
-🧪 Tests: 1 passed · 0 failed · 0 unknown
+⏱ 42 s · Model: gpt-5-codex
 ```
 
-Rich completion messages have an open Summary section and collapsible Diff, Tests, and
-Details sections where available. Dynamic HTML is escaped. A transport/method failure uses
+The heading uses the Codex session name (the name shown by Codex, or the first prompt
+when the session has no name). Rich completion messages have an open Summary section and a
+collapsible Details section. Recorded tests remain available through `/cxtests`. Dynamic HTML is escaped. A transport/method failure uses
 the equivalent expandable-blockquote fallback through Hermes.
 
 ## Attention and errors
