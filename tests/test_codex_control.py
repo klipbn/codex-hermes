@@ -177,5 +177,30 @@ class ControlTests(unittest.TestCase):
         self.assertIn('🤖 —',result)
 
 
+    def test_session_details_match_the_opencode_layout_without_diff_or_tests(self):
+        from datetime import datetime, timezone, timedelta
+        folder = self.base / 'sessions'; folder.mkdir()
+        now = datetime.now(timezone.utc)
+        (folder / 's.json').write_text(json.dumps({'schemaVersion': 1, 'source': 'codex',
+            'sessionID': 'session-x', 'title': '[TRG-1] - \u0417\u0430\u0434\u0430\u0447\u0430', 'project': 'demo-project',
+            'directory': str(Path.home() / 'work/demo-project'), 'status': 'idle', 'model': 'gpt-6-luna',
+            'updatedAt': now.isoformat(),
+            'turns': [{'finishedAt': (now - timedelta(minutes=5)).isoformat(), 'outcome': 'done',
+                       'durationMs': 1968000, 'summary': 'Line one\n\nLine two', 'testsAvailable': False}]}))
+        result = self.command('cx', '1')
+        lines = result.splitlines()
+        self.assertEqual(lines[0], '🟢 Codex · IDLE')
+        self.assertIn('📝 [TRG-1] - \u0417\u0430\u0434\u0430\u0447\u0430', lines)
+        self.assertIn('📁 demo-project', lines)
+        self.assertIn('📂 ~/work/demo-project', lines)
+        self.assertIn('⏱️ 5m ago', lines)
+        self.assertIn('🆔 session-x', lines)
+        self.assertIn('🤖 Model gpt-6-luna', lines)
+        self.assertIn('🏁 Last turn: done · 32m', lines)
+        self.assertIn('🧠 Last summary\nLine one\n\nLine two', result)
+        for removed in ('Tests', 'diff', 'Cost', 'Updated:'):
+            self.assertNotIn(removed, result)
+
+
 if __name__ == '__main__':
     unittest.main()
