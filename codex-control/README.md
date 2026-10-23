@@ -1,4 +1,4 @@
-# Codex Control 1.4.0
+# Codex Control 1.4.1
 
 A standalone Hermes command plugin for Codex CLI observations from codex-watch.
 It reads local state and never calls an LLM, resumes a thread, or decides permissions.

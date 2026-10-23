@@ -177,7 +177,7 @@ class ControlTests(unittest.TestCase):
         self.assertIn('🤖 —',result)
 
 
-    def test_session_details_match_the_opencode_layout_without_diff_or_tests(self):
+    def test_session_details_match_the_opencode_layout(self):
         from datetime import datetime, timezone, timedelta
         folder = self.base / 'sessions'; folder.mkdir()
         now = datetime.now(timezone.utc)
@@ -196,10 +196,17 @@ class ControlTests(unittest.TestCase):
         self.assertIn('⏱️ 5m ago', lines)
         self.assertIn('🆔 session-x', lines)
         self.assertIn('🤖 Model gpt-6-luna', lines)
-        self.assertIn('🏁 Last turn: done · 32m', lines)
-        self.assertIn('🧠 Last summary\nLine one\n\nLine two', result)
-        for removed in ('Tests', 'diff', 'Cost', 'Updated:'):
+        self.assertTrue(result.endswith('🧠 Last summary\nLine one\n\nLine two\n\n📦 Session diff\nUnavailable'
+                                        '\n\n🧪 Tests\nUnavailable'), result)
+        for removed in ('Cost', 'Updated:', 'Outcome:'):
             self.assertNotIn(removed, result)
+        state = json.loads((folder / 's.json').read_text())
+        state['turns'][0].update(testsAvailable=True, tests=[{'status': 'failed', 'command': 'npm test'}])
+        (folder / 's.json').write_text(json.dumps(state))
+        self.assertTrue(self.command('cx', '1').endswith('🧪 Tests\n❌ npm test'))
+        state['turns'][0]['tests'] = []
+        (folder / 's.json').write_text(json.dumps(state))
+        self.assertTrue(self.command('cx', '1').endswith('🧪 Tests\nTests not run'))
 
 
 if __name__ == '__main__':
