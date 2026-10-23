@@ -171,7 +171,7 @@ class ControlTests(unittest.TestCase):
             'sessionID': 's', 'status': 'idle', 'project': 'hermes', 'updatedAt': now.isoformat(),
             'turns': [{'finishedAt': (now-timedelta(minutes=7)).isoformat()}]}))
         result=self.command('cx')
-        self.assertIn('🟢 1 · IDLE',result)
+        self.assertIn('⚪️ 1 · IDLE',result)
         self.assertIn('7m ago',result)
         self.assertNotIn('0s',result)
         self.assertIn('🤖 —',result)
@@ -189,7 +189,7 @@ class ControlTests(unittest.TestCase):
                        'durationMs': 1968000, 'summary': 'Line one\n\nLine two', 'testsAvailable': False}]}))
         result = self.command('cx', '1')
         lines = result.splitlines()
-        self.assertEqual(lines[0], '🟢 Codex · IDLE')
+        self.assertEqual(lines[0], '⚪️ Codex · IDLE')
         self.assertIn('📝 [TRG-1] - \u0417\u0430\u0434\u0430\u0447\u0430', lines)
         self.assertIn('📁 demo-project', lines)
         self.assertIn('📂 ~/work/demo-project', lines)
