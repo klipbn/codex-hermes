@@ -1,5 +1,12 @@
 # codex-watch changelog
 
+## 1.5.0 — 2026-10-23
+
+- Use the Codex session name from the local session index instead of the first prompt for embedded CLI sessions.
+- Start notification headings with `Codex · 📝 <session name>`, matching OpenCode notifications; the status line no longer repeats `Codex`.
+- Remove the always-unavailable Diff section and the Tests section from Telegram notifications; `/cxtests` and `/cxsum` are unchanged.
+- Skip a damaged local journal record instead of failing discovery for every local session.
+
 ## 1.4.0 — 2026-10-17
 
 - Discover embedded-server CLI sessions through open writer descriptors, a read-only SQLite index, and bounded local journal reads, independently of the shared daemon.

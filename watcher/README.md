@@ -1,4 +1,4 @@
-# codex-watch 1.4.0
+# codex-watch 1.5.0
 
 Codex CLI session observations and Telegram notifications through Hermes.
 Requires Node 22.13+. This source package includes an MIT LICENSE and has no runtime npm dependencies.

@@ -129,6 +129,7 @@ test('daemon error summaries retain Unicode external errors and use English noti
         fallback: async html => delivered.push(html),
     });
     assert.equal(delivered.length, 1);
-    assert.ok(delivered[0].includes('❌ Error · Codex'));
+    assert.ok(delivered[0].startsWith('<b>Codex · 📝 '));
+    assert.ok(delivered[0].includes('❌ Error · project'));
     assert.ok(delivered[0].includes(externalError.replace('<connection>', '&lt;connection&gt;').replace('& retry', '&amp; retry')));
 });

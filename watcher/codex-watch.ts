@@ -1,4 +1,4 @@
-/** Codex CLI → Hermes v1.4.0. Uses only node:* modules, Node 22.13+ (--experimental-strip-types).
+/** Codex CLI → Hermes v1.5.0. Uses only node:* modules, Node 22.13+ (--experimental-strip-types).
  * hook makes no decisions or network calls; run is the only state writer.
  * Release history is in CHANGELOG.md next to this file.
  */
@@ -12,7 +12,7 @@ import { connectDaemon, daemonSnapshot, terminalThread } from './codex-daemon.ts
 import type { ReadOnlyRpc } from './codex-daemon.ts';
 import { LocalDiscovery } from './codex-local.ts';
 
-export const WATCHER_VERSION = '1.4.0';
+export const WATCHER_VERSION = '1.5.0';
 type Dict = Record<string, any>;
 const EVENTS = ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse',
     'PermissionRequest', 'Stop', 'Interrupt', 'SessionEnd'];
@@ -308,24 +308,19 @@ function escaped(s: unknown, max: number) {
 }
 export function renderNotification(n: Dict): { rich: string; fallback: string } {
     const s = n.state, turn = n.turn || {};
-    const title = escaped(`📝 ${s.title || s.project || 'Codex'}`, 200);
+    const title = escaped(`Codex · 📝 ${s.title || s.project || 'Untitled session'}`, 200);
     const label = n.level === 'permission' ? '🔐 Awaiting approval' : n.level === 'reminder'
         ? '⏰ Still awaiting approval' : turn.outcome === 'interrupted' ? '⏹ Turn interrupted' : turn.outcome === 'error' ? '❌ Error' : '✅ Completed';
-    const status = `${label} · Codex · ${escaped(s.project, 160)}`;
+    const status = `${label} · ${escaped(s.project || 'unknown project', 160)}`;
     const summary = escaped(turn.summary || 'Approve the action in your Codex terminal.', 1700);
-    const counts = turn.testCounts;
-    const tests = counts && turn.testsAvailable !== false ? `✅ ${counts.passed} · ❌ ${counts.failed} · ❔ ${counts.unknown}` : 'unavailable';
     const duration = typeof turn.durationMs === 'number' ? `${Math.round(turn.durationMs / 1000)} s` : 'unavailable';
     const meta = `⏱ ${duration} · Model: ${escaped(turn.model, 150) || 'unavailable'}\nCost / tokens: unavailable`;
     const date = escaped(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Moscow',
         dateStyle: 'full', timeStyle: 'short', hour12: false }).format(new Date(n.at || Date.now())) + ' MSK', 180);
     return {
         rich: `<h3>${title}</h3><p>${status}</p><details open><summary>🧠 Summary</summary><p>${summary.replace(/\n/g, '<br>')}</p></details>` +
-            `<details><summary>📦 Diff</summary><p>Unavailable: hooks do not provide a full diff.</p></details>` +
-            `<details><summary>🧪 Tests · ${tests}</summary><p>Details: /cxtests ${escaped(s.sessionID, 256)}</p></details>` +
             `<details><summary>📊 Details</summary><p>${meta.replace(/\n/g, '<br>')}</p></details><footer>${date}</footer>`,
-        fallback: `<b>${title}</b>\n${status}\n\n${summary}\n\n<blockquote expandable>📦 Diff: unavailable</blockquote>\n` +
-            `<blockquote expandable>🧪 Tests · ${tests}\n/cxtests ${escaped(s.sessionID, 256)}</blockquote>\n${meta}\n<i>${date}</i>`,
+        fallback: `<b>${title}</b>\n${status}\n\n${summary}\n\n${meta}\n<i>${date}</i>`,
     };
 }
 

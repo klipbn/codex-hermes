@@ -189,7 +189,7 @@ test('rich transport failure falls back to a complete HTML message', async t => 
         rich: async () => { throw new Error('timeout'); },
         fallback: async html => { fallback = html; },
     });
-    assert.ok(fallback.startsWith('<b>📝 &lt;\u0442\u0435\u0441\u0442&gt;</b>'));
+    assert.ok(fallback.startsWith('<b>Codex · 📝 &lt;\u0442\u0435\u0441\u0442&gt;</b>'));
     assert.ok(fallback.endsWith('</i>'));
 });
 
@@ -267,7 +267,10 @@ test('notifications use English labels and Moscow 24-hour dates while preserving
             assert.ok(html.includes('Cost / tokens: unavailable'));
         }
         assert.ok(rendered.rich.includes('Summary'));
-        assert.ok(rendered.rich.includes('Tests'));
+        for (const html of Object.values(rendered)) {
+            assert.ok(html.includes('Codex · 📝 '), html);
+            assert.ok(!html.includes('Diff') && !html.includes('Tests'), html);
+        }
     }
     const approval = watcher.renderNotification({ level: 'permission', state });
     assert.ok(approval.rich.includes('Approve the action in your Codex terminal.'));
